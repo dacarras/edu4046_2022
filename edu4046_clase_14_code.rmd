@@ -3,36 +3,16 @@ title: "Code: CFA ejemplos"
 subtitle: "clase 14"
 author: "dacarras"
 date: '`r format(Sys.time(), "%a %b %d, %Y")`'
-output:
-  html_document:
-    theme: paper
-    highlight: kate
-    number_sections: true
-    toc: true
-    toc_float:
-      collapsed: false
-      smooth_scroll: false
-    fig_width: 10 
-    fig_height: 8 
+output: github_document
 ---
 
-<style>
-  .main-container {
-    max-width: 1600px !important;
-  }
-  .list-group-item.active, 
-  .list-group-item.active:focus, 
-  .list-group-item.active:hover {
-    background-color: #373334;
-  }
-</style>
-
-
-
 ```{r setup, include=FALSE}
+
 #------------------------------------------------------------------------------
 # setup
 #------------------------------------------------------------------------------
+# resolution
+knitr::opts_chunk$set(dpi=300,fig.width=7)
 
 # knitr option
 knitr::opts_chunk$set(dev = 'png')
@@ -54,15 +34,8 @@ Sys.setenv(LANG="en_US.UTF-8")
 library(dplyr)
 
 
-# ------------------------------------------------------
-# get times
-# ------------------------------------------------------
-
-start_time <- Sys.time()
-
 
 ```
-
 
 # CFA tradicional
 
