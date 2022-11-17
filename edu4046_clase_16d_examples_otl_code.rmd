@@ -1,0 +1,1202 @@
+---
+title: "Code: Mediación (OTL) ejemplos"
+subtitle: "clase 16"
+author: "dacarras"
+date: 'Noviembre 17, 2022'
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(dpi=300,fig.width = 10, fig.asp = 1.15)
+```
+
+
+# Update psi2301 packages
+
+```{r, echo=TRUE}
+
+#------------------------------------------------------------------------------
+# update psi2301
+#------------------------------------------------------------------------------
+
+# -----------------------------------------------
+# get github
+# -----------------------------------------------
+
+# credentials::set_github_pat()
+
+# remotes::install_github("dacarras/psi2301")
+
+```
+
+# Prepare data
+
+```{r, echo=TRUE}
+
+#------------------------------------------------------------------------------
+# prepare data
+#------------------------------------------------------------------------------
+
+# -----------------------------------------------
+# load dplyr
+# -----------------------------------------------
+
+library(dplyr)
+
+
+ctry_name_table <- read.table(text = "
+IDCNTRY  ctry_name
+12  'Algeria'
+32  'Argentina'
+36  'Australia'
+40  'Austria'
+48  'Bahrain'
+51  'Armenia'
+70  'Bosnia and Herzegovina'
+72  'Botswana'
+76  'Brazil'
+84  'Belize'
+100 'Bulgaria'
+124 'Canada'
+152 'Chile'
+158 'Chinese Taipei'
+170 'Colombia'
+196 'Cyprus'
+200 'Czech Republic'
+203 'Czech Republic'
+208 'Denmark'
+214 'Dominican Republic'
+222 'El Salvador'
+233 'Estonia'
+246 'Finland'
+250 'France'
+268 'Georgia'
+275 'Palestinian National Authority'
+276 'Germany'
+288 'Ghana'
+300 'Greece'
+320 'Guatemala'
+344 'Hong Kong, SAR'
+348 'Hungary'
+352 'Iceland'
+360 'Indonesia'
+364 'Iran, Islamic Republic of'
+372 'Ireland'
+376 'Israel'
+380 'Italy'
+392 'Japan'
+398 'Kazakhstan'
+400 'Jordan'
+410 'Korea, Republic of'
+414 'Kuwait'
+422 'Lebanon'
+428 'Latvia'
+438 'Liechtenstein'
+440 'Lithuania'
+442 'Luxembourg'
+458 'Malaysia'
+470 'Malta'
+484 'Mexico'
+496 'Mongolia'
+498 'Moldova'
+504 'Morocco'
+512 'Oman'
+528 'Netherlands'
+554 'New Zealand'
+578 'Norway'
+600 'Paraguay'
+608 'Philippines'
+616 'Poland'
+620 'Portugal'
+634 'Qatar'
+642 'Romania'
+643 'Russian Federation'
+682 'Saudi Arabia'
+702 'Singapore'
+703 'Slovak Republic'
+705 'Slovenia'
+710 'South Africa'
+724 'Spain'
+752 'Sweden'
+756 'Switzerland'
+760 'Syria, Arab Republic of'
+764 'Thailand'
+780 'Trinidad And Tobago'
+788 'Tunisia'
+792 'Turkey'
+804 'Ukraine'
+807 'Macedonia'
+818 'Egypt'
+826 'England'
+840 'United States'
+887 'Yemen'
+891 'Serbia'
+926 'England'
+927 'Scotland'
+956 'Belgium (Flemish)'
+957 'Belgium (French)'
+3724  'Spain (Basque Country)'
+3752  'Sweden (Grade 3)'
+4710  'South Africa (Grade 4)'
+6162  'Poland (Second-Cycle Programs)'
+6431  'Russian Federation (Moscow)'
+7241  'Spain (Catalonia)'
+7841  'United Arab Emirates (Dubai)'
+9132  'Canada (Ontario)'
+9133  'Canada (Quebec)'
+9134  'Canada (Alberta)'
+9135  'Canada (British Columbia)'
+9136  'Canada (Novia Scotia)'
+9352  'Iceland (Grade 5)'
+9578  'Norway (Grade 5)'
+9702  'Singapore National'
+11800 'United States (Indiana)'
+12500 'United States (Massachusetts)'
+12700 'United States (Minnesota)'
+48401 'Mexico (Generales/Tecnicas/Privadas)'
+48402 'Mexico (Telesecundarias)'
+48499 'Mexico (Talis-Nacional)'
+57891 'Norway (ALU)'
+57892 'Norway (ALU +)'
+57893 'Norway (PPU)'
+57894 'Norway (MASTERS)'
+",
+head = TRUE)
+
+
+# -----------------------------------------------
+# load data
+# -----------------------------------------------
+
+iccs_09 <- psi2301::iccs_2009
+
+# -----------------------------------------------
+# variable centering
+# -----------------------------------------------
+
+iccs_otl <- iccs_09 %>%
+# add country names
+dplyr::left_join(., ctry_name_table, by = 'IDCNTRY') %>%
+# father tertiary education
+mutate(edt_m = case_when(
+    MISCED == 0 ~ 0, # not complete ISCED 1
+    MISCED == 1 ~ 0, # ISCED 1 primary
+    MISCED == 2 ~ 0, # ISCED 2 lower secondary
+    MISCED == 3 ~ 0, # ISCED 3 upper secondary
+    MISCED == 4 ~ 0, # ISCED 4 post secondary, non tertiary
+    MISCED == 5 ~ 1  # ISCED 5A or 6 Tertiary Education
+    )) %>%
+# highest parent tertiary education
+mutate(edt_f = case_when(
+    FISCED == 0 ~ 0, # not complete ISCED 1
+    FISCED == 1 ~ 0, # ISCED 1 primary
+    FISCED == 2 ~ 0, # ISCED 2 lower secondary
+    FISCED == 3 ~ 0, # ISCED 3 upper secondary
+    FISCED == 4 ~ 0, # ISCED 4 post secondary, non tertiary
+    FISCED == 5 ~ 1  # ISCED 5A or 6 Tertiary Education
+    )) %>%
+mutate(edt_max = pmax(edt_f, edt_m)) %>%
+## tertiary education among parents
+mutate(edt = edt_max)        %>%  # mean score
+mutate(edt_c = r4sda::c_mean(edt, id_j)) %>%  # means by group
+mutate(edt_g = r4sda::c_mean(edt, id_k)) %>%  # grand mean             
+mutate(edt_w = edt - edt_c   )    %>%  # centering within cluster
+mutate(edt_m = edt - edt_g   )    %>%  # centering to the grand mean
+mutate(edt_b = edt_c - edt_g )    %>%  # centered cluster means
+## ses
+mutate(ses = NISB) %>%
+mutate(ses = r4sda::z_score(ses))        %>%  # mean score
+mutate(ses_c = r4sda::c_mean(ses, id_j)) %>%  # means by group
+mutate(ses_g = r4sda::c_mean(ses, id_k)) %>%  # grand mean             
+mutate(ses_w = ses - ses_c   )    %>%  # centering within cluster
+mutate(ses_m = ses - ses_g   )    %>%  # centering to the grand mean
+mutate(ses_b = ses_c - ses_g )    %>%  # centered cluster means
+## classroom discussion
+mutate(opd = OPDISC)                     %>%  # mean score
+mutate(opd = r4sda::z_score(opd))        %>%  # mean score
+mutate(opd_c = r4sda::c_mean(opd, id_j)) %>%  # means by group
+mutate(opd_g = r4sda::c_mean(opd, id_k)) %>%  # grand mean
+mutate(opd_w = opd - opd_c   )    %>%  # centering within cluster
+mutate(opd_m = opd - opd_g   )    %>%  # centering to the grand mean
+mutate(opd_b = opd_c - opd_g )    %>%  # centered cluster means
+## civ
+mutate(civ = PV1CIV) %>%
+mutate(civ = (civ-500)/100)              %>%  # mean score
+mutate(civ_c = r4sda::c_mean(civ, id_j)) %>%  # means by group
+mutate(civ_g = r4sda::c_mean(civ, id_k)) %>%  # grand mean                     
+mutate(civ_w = civ - civ_c  )  %>%  # centering within cluster
+mutate(civ_m = civ - civ_g  )  %>%  # centering to the grand mean
+mutate(civ_b = civ_c - civ_g)  %>%  # centered cluster means
+# select variables
+dplyr::select(ctry_name, id_j, edt:edt_b, ses:ses_b, opd:opd_b, civ:civ_b) %>%
+dplyr::glimpse()
+
+
+```
+
+# Population Model
+
+
+## Naive Model
+
+- New Zealand
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_med <- iccs_otl %>%
+            dplyr::filter(ctry_name %in% c('New Zealand')) %>%
+            dplyr::select(civ, ses, opd_b, id_j) %>%
+            na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+civ ~ c*ses   # y <- x
+civ ~ b*opd_b # y <- m
+
+opd_b ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+pme := ind/tot
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m01 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_med)
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m01, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m01) %>%
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+```
+
+## Clustered Errors
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_med <- iccs_otl %>%
+            dplyr::filter(ctry_name %in% c('New Zealand')) %>%
+            dplyr::select(civ, ses, opd_b, id_j) %>%
+            na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+civ ~ c*ses   # y <- x
+civ ~ b*opd_b # y <- m
+
+opd_b ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+pme := ind/tot
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m02 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_med,
+       cluster = 'id_j') 
+
+# Mote: last line requests clustered errors
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m02, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m02) %>%
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+## Bootstrapped errors
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_med <- iccs_otl %>%
+            dplyr::filter(ctry_name %in% c('New Zealand')) %>%
+            dplyr::select(civ, ses, opd_b, id_j) %>%
+            na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+civ ~ c*ses   # y <- x
+civ ~ b*opd_b # y <- m
+
+opd_b ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+pme := ind/tot
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m03 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_med,
+       bootstrap = 5000,
+       se = 'bootstrap')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m03, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m03,
+boot.ci.type = "bca.simple") %>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+# Multilevel
+
+## Multilevel latent covariate with SES
+
+- 1-1-1 model (unconflated MLM)
+- Preacher, K. J., Zyphur, M. J., & Zhang, Z. (2010). A general multilevel SEM framework for assessing multilevel mediation. Psychological Methods, 15(3), 209–233. https://doi.org/10.1037/a0020141
+- [download link](https://www.dropbox.com/s/gxa0hj0o61fu7tg/Preacher%2C%20Zyphur%2C%20Zhang_2010.pdf?dl=1)
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_mlm <- iccs_otl %>%
+            dplyr::filter(ctry_name %in% c('New Zealand')) %>%
+            dplyr::select(civ, ses, opd, id_j) %>%
+            na.omit()
+
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+level: 1
+civ ~ c1*ses # y <- x
+civ ~ b1*opd # y <- m
+opd ~ a1*ses # m <- x
+
+opd ~ 0*1 
+
+level: 2
+civ ~ c2*ses # y <- x
+civ ~ b2*opd # y <- m
+opd ~ a2*ses # m <- x
+
+## L1 effects
+xm1  := a1
+my1  := b1
+xy1  := c1
+tot1 := c1 + a1*b1
+ind1 := a1*b1
+dir1 := c1
+pme1 := ind1/tot1
+
+## L2 effects
+xm2  := a2
+my2  := b2
+xy2  := c2
+tot2 := c2 + a2*b2
+ind2 := a2*b2
+dir2 := c2
+pme2 := ind2/tot2
+
+# decomposition
+ses_c  := tot2 - tot1
+ses_w  := tot1
+otl_b  := a2*b2
+ses_p  := tot2 - tot1 - a2*b2
+total  := ses_p + ses_w + otl_b
+pme_c  := ind2/ses_c
+pme_t  := ind2/total
+
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_mlm,
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m04, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m04)%>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+
+# MLM estimates from all countries
+
+## MSEM as a function
+
+```{r, echo = TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+get_otl <- function(data){
+
+data_model <- data
+
+get_otl_mlm <- function(data){
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_mlm <- data %>%
+            dplyr::select(civ, ses, opd, id_j) %>%
+            group_by(id_j) %>%
+            mutate(n_j = n()) %>%
+            ungroup() %>%
+            # dplyr::filter(n_j > 9) %>%
+            na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+level: 1
+civ ~ c1 * ses   # y <- x
+civ ~ b1 * opd   # y <- m
+opd ~ a1 * ses   # m <- x
+
+
+level: 2
+civ ~ c2 * ses   # y <- x
+civ ~ b2 * opd   # y <- m
+opd ~ a2 * ses   # m <- x
+
+
+# L1 effects
+xm1  := a1
+my1  := b1
+xy1  := c1
+tot1 := c1 + a1*b1
+ind1 := a1*b1
+dir1 := c1
+pme1 := ind1/tot1
+
+
+# L2 effects
+xm2  := a2
+my2  := b2
+xy2  := c2
+tot2 := c2 + a2*b2
+ind2 := a2*b2
+dir2 := c2
+pme2 := ind2/tot2
+
+# decomposition
+ses_c  := tot2 - tot1
+ses_w  := tot1
+otl_b  := a2*b2
+ses_p  := tot2 - tot1 - a2*b2
+total  := ses_p + ses_w + otl_b
+pme_c  := ind2/ses_c
+pme_t  := ind2/total
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_mlm,
+       cluster = 'id_j')
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+est <- lavaan::parameterEstimates(m04)%>% 
+dplyr::filter(op == ':=')
+
+#------------------------------------------------
+# return
+#------------------------------------------------
+
+return(est)
+
+}
+
+#------------------------------------------------
+# run through all
+#------------------------------------------------
+
+otl_est <- data_model %>%
+           split(.$ctry_name) %>%
+           purrr::map( ~ get_otl_mlm(data = .))  %>%
+           dplyr::bind_rows(., .id = 'ctry_name')
+
+#------------------------------------------------
+# return
+#------------------------------------------------
+
+return(otl_est)
+
+}
+
+# -----------------------------------------------
+# create estimates
+# -----------------------------------------------
+
+otl_est <- get_otl(iccs_otl)
+
+# -----------------------------------------------
+# display estimates
+# -----------------------------------------------
+
+otl_est %>%
+knitr::kable(., digits = 2)
+
+# -----------------------------------------------
+# display estimates
+# -----------------------------------------------
+
+otl_est %>%
+dplyr::filter(lhs %in% c('my2')) %>%
+arrange(desc(est)) %>%
+knitr::kable(., digits = 2)
+
+
+otl_est %>%
+dplyr::filter(lhs %in% c('ind2')) %>%
+arrange(desc(est)) %>%
+knitr::kable(., digits = 2)
+
+
+otl_est %>%
+dplyr::filter(lhs %in% c('pme_c')) %>%
+arrange(desc(est)) %>%
+knitr::kable(., digits = 2)
+
+otl_est %>%
+dplyr::filter(lhs %in% c('pme_t')) %>%
+arrange(desc(est)) %>%
+knitr::kable(., digits = 2)
+
+
+
+
+```
+
+# Plots
+
+## Plot of total SES gap
+
+```{r, echo = TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+library(ggplot2)
+
+# -----------------------------------------------
+# display estimates
+# -----------------------------------------------
+
+order_plot <- otl_est %>%
+              dplyr::filter(lhs %in% c('total')) %>%
+              arrange(est) %>%
+              mutate(order = seq(1:nrow(.))) %>%
+              dplyr::select(ctry_name, order) %>%
+              dplyr::glimpse()
+
+data_plot <- otl_est %>%
+             dplyr::filter(lhs %in% c('total')) %>%
+             mutate(type = case_when(
+              lhs == 'total' ~ 'ses b'
+              )) %>%
+              mutate(alpha_w = case_when(
+              pvalue >  .05 ~ .2,
+              pvalue <= .05 ~ 1
+              )) %>%
+             dplyr::left_join(., order_plot, by = 'ctry_name') %>%
+             arrange(order) %>%
+             mutate(type_fct = forcats::as_factor(type)) %>%
+             dplyr::glimpse()
+
+alpha_weight <- data_plot$alpha_w
+
+
+# -----------------------------------------------
+# colour palette
+# -----------------------------------------------
+
+# primary
+unesco_blue <- '#0077d4'
+sdg4_red    <- '#c5192d'
+
+# secondary
+light_green <- '#95c11f'
+purple      <- '#9f358b'
+orange      <- '#f39200'
+
+# tertiary
+yellow      <- '#ffd500'
+magenta     <- '#ec619f'
+cyan        <- '#00b1eb'
+dark_blue   <- '#004d6d'
+
+
+# -----------------------------------------------
+# define selected colors
+# -----------------------------------------------
+
+color_0    <- dark_blue
+color_1    <- 'grey20'      # darken colour
+color_2    <- sdg4_red      # light colour
+plot_color <- unesco_blue
+
+# Stacked
+ses_plot <- ggplot(data_plot, 
+    aes(
+      colour = type_fct, 
+      fill   = type_fct, 
+      y      = est, 
+      x      = reorder(ctry_name, order
+        ))) + 
+    geom_bar(
+      position="stack", 
+      stat="identity",
+      alpha = alpha_weight
+      ) +
+ylim(-.5,2) +
+    coord_flip() +
+scale_fill_manual(values = c(unesco_blue)) +
+scale_color_manual(values = c('grey20')) +
+ylab('SES gap on civic knoweledge decomposition
+  \nSES total = ses_w + ses_c
+  \n(y, m = 0, sd = 1)') +
+xlab('Countries') +
+theme(
+axis.text.y = element_text(colour = color_1, size = 9),
+axis.text.x = element_text(colour = color_1, size = 8),
+panel.background = element_blank(),
+panel.grid.minor = element_blank(),
+panel.grid.major = element_blank(),
+panel.grid.major.y = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_1
+      ),          
+panel.grid.major.x = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_2
+      ),          
+axis.ticks = element_blank(),
+legend.title = element_blank(),
+legend.background=element_blank(),
+legend.key =element_rect(fill = NA),
+panel.border = element_blank(),
+    axis.line.x = 
+    element_line(
+      size = 0.4, 
+      linetype = 'solid', 
+      colour = color_1),
+    axis.line.y = 
+    element_line(
+      size = 0.4,
+      linetype = 'solid',
+      colour = color_1),
+text = element_text(size = 10,  family = 'Avenir'),
+plot.title = element_text(
+  family = "Avenir", 
+  size = 10, 
+  hjust = 0.5,
+  colour = color_1) 
+    )
+
+# -----------------------------------------------
+# display plot
+# -----------------------------------------------
+
+ses_plot
+
+```
+
+## Plot of SES contextual
+
+```{r, echo = TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+library(ggplot2)
+
+# -----------------------------------------------
+# display estimates
+# -----------------------------------------------
+
+order_plot <- otl_est %>%
+              dplyr::filter(lhs %in% c('total')) %>%
+              arrange(est) %>%
+              mutate(order = seq(1:nrow(.))) %>%
+              dplyr::select(ctry_name, order) %>%
+              dplyr::glimpse()
+
+data_plot <- otl_est %>%
+             dplyr::filter(lhs %in% c('ses_c','ses_w')) %>%
+             mutate(type = case_when(
+              lhs == 'ses_c' ~ 'ses contextual',
+              lhs == 'ses_w' ~ 'ses within'
+              )) %>%
+             mutate(stacked_order = case_when(
+              lhs == 'ses_w' ~ 2,
+              lhs == 'ses_c' ~ 1
+              )) %>%
+              mutate(alpha_w = case_when(
+              pvalue >  .05 ~ .2,
+              pvalue <= .05 ~ 1
+              )) %>%
+             dplyr::left_join(., order_plot, by = 'ctry_name') %>%
+             arrange(order, stacked_order) %>%
+             mutate(type_fct = forcats::as_factor(type)) %>%
+             dplyr::glimpse()
+
+alpha_weight <- data_plot$alpha_w
+
+
+alpha_weight <- data_plot$alpha_w
+
+
+# -----------------------------------------------
+# colour palette
+# -----------------------------------------------
+
+# primary
+unesco_blue <- '#0077d4'
+sdg4_red    <- '#c5192d'
+
+# secondary
+light_green <- '#95c11f'
+purple      <- '#9f358b'
+orange      <- '#f39200'
+
+# tertiary
+yellow      <- '#ffd500'
+magenta     <- '#ec619f'
+cyan        <- '#00b1eb'
+dark_blue   <- '#004d6d'
+
+
+# -----------------------------------------------
+# define selected colors
+# -----------------------------------------------
+
+color_0    <- dark_blue
+color_1    <- 'grey20'      # darken colour
+color_2    <- sdg4_red      # light colour
+plot_color <- unesco_blue
+
+# Stacked
+ce_plot <- ggplot(data_plot, 
+    aes(
+      colour = type_fct, 
+      fill   = type_fct, 
+      y      = est, 
+      x      = reorder(ctry_name, order
+        ))) + 
+    geom_bar(
+      position="stack", 
+      stat="identity",
+      alpha = alpha_weight
+      ) +
+ylim(-.5,2) +
+    coord_flip() +
+scale_fill_manual(values = c(unesco_blue, orange)) +
+scale_color_manual(values = c('grey20', 'grey20')) +
+ylab('SES gap on civic knoweledge decomposition
+  \nSES total = ses_w + ses_c
+  \n(y, m = 0, sd = 1)') +
+xlab('Countries') +
+theme(
+axis.text.y = element_text(colour = color_1, size = 9),
+axis.text.x = element_text(colour = color_1, size = 8),
+panel.background = element_blank(),
+panel.grid.minor = element_blank(),
+panel.grid.major = element_blank(),
+panel.grid.major.y = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_1
+      ),          
+panel.grid.major.x = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_2
+      ),          
+axis.ticks = element_blank(),
+legend.title = element_blank(),
+legend.background=element_blank(),
+legend.key =element_rect(fill = NA),
+panel.border = element_blank(),
+    axis.line.x = 
+    element_line(
+      size = 0.4, 
+      linetype = 'solid', 
+      colour = color_1),
+    axis.line.y = 
+    element_line(
+      size = 0.4,
+      linetype = 'solid',
+      colour = color_1),
+text = element_text(size = 10,  family = 'Avenir'),
+plot.title = element_text(
+  family = "Avenir", 
+  size = 10, 
+  hjust = 0.5,
+  colour = color_1) 
+    )
+
+# -----------------------------------------------
+# display plot
+# -----------------------------------------------
+
+ce_plot
+
+```
+
+## Plot of decomposition
+
+```{r, echo = TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+library(ggplot2)
+
+# -----------------------------------------------
+# display estimates
+# -----------------------------------------------
+
+order_plot <- otl_est %>%
+              dplyr::filter(lhs %in% c('total')) %>%
+              arrange(est) %>%
+              mutate(order = seq(1:nrow(.))) %>%
+              dplyr::select(ctry_name, order) %>%
+              dplyr::glimpse()
+
+data_plot <- otl_est %>%
+             dplyr::filter(lhs %in% c('ses_p','ses_w','otl_b')) %>%
+             mutate(type = case_when(
+              lhs == 'ses_p' ~ 'ses direct(c)',
+              lhs == 'ses_w' ~ 'ses direct(w)',
+              lhs == 'otl_b' ~ 'ses indirect (otl)'
+              )) %>%
+             mutate(stacked_order = case_when(
+              lhs == 'ses_p' ~ 3,
+              lhs == 'ses_c' ~ 2,              
+              lhs == 'otl_b' ~ 1
+              )) %>%
+              mutate(alpha_w = case_when(
+              pvalue >  .05 ~ .2,
+              pvalue <= .05 ~ 1
+              )) %>%
+             dplyr::left_join(., order_plot, by = 'ctry_name') %>%
+             arrange(order, stacked_order) %>%
+             mutate(type_fct = forcats::as_factor(type)) %>%
+             dplyr::glimpse()
+
+alpha_weight <- data_plot$alpha_w
+
+
+# -----------------------------------------------
+# colour palette
+# -----------------------------------------------
+
+# primary
+unesco_blue <- '#0077d4'
+sdg4_red    <- '#c5192d'
+
+# secondary
+light_green <- '#95c11f'
+purple      <- '#9f358b'
+orange      <- '#f39200'
+
+# tertiary
+yellow      <- '#ffd500'
+magenta     <- '#ec619f'
+cyan        <- '#00b1eb'
+dark_blue   <- '#004d6d'
+
+
+# -----------------------------------------------
+# define selected colors
+# -----------------------------------------------
+
+color_0    <- dark_blue
+color_1    <- 'grey20'      # darken colour
+color_2    <- sdg4_red      # light colour
+plot_color <- unesco_blue
+
+# Stacked
+gap_plot <- ggplot(data_plot, 
+    aes(
+      colour = type_fct, 
+      fill   = type_fct, 
+      y      = est, 
+      x      = reorder(ctry_name, order
+        ))) + 
+    geom_bar(
+      position="stack", 
+      stat="identity",
+      alpha = alpha_weight
+      ) +
+ylim(-.5,2) +
+    coord_flip() +
+scale_fill_manual(values = c(sdg4_red, unesco_blue, orange)) +
+scale_color_manual(values = c('grey20', 'grey20', 'grey20')) +
+ylab('SES gap on civic knoweledge decomposition
+  \nwithin, contextual, and indirect
+  \n(y, m = 0, sd = 1)') +
+xlab('Countries') +
+theme(
+axis.text.y = element_text(colour = color_1, size = 9),
+axis.text.x = element_text(colour = color_1, size = 8),
+panel.background = element_blank(),
+panel.grid.minor = element_blank(),
+panel.grid.major = element_blank(),
+panel.grid.major.y = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_1
+      ),          
+panel.grid.major.x = element_line(
+      size = 0.1, 
+      linetype = 'solid', 
+      colour = color_2
+      ),          
+axis.ticks = element_blank(),
+legend.title = element_blank(),
+legend.background=element_blank(),
+legend.key =element_rect(fill = NA),
+panel.border = element_blank(),
+    axis.line.x = 
+    element_line(
+      size = 0.4, 
+      linetype = 'solid', 
+      colour = color_1),
+    axis.line.y = 
+    element_line(
+      size = 0.4,
+      linetype = 'solid',
+      colour = color_1),
+text = element_text(size = 10,  family = 'Avenir'),
+plot.title = element_text(
+  family = "Avenir", 
+  size = 10, 
+  hjust = 0.5,
+  colour = color_1) 
+    )
+
+# -----------------------------------------------
+# display plot
+# -----------------------------------------------
+
+gap_plot
+
+```
+
+
+## Total and Contextual
+
+```{r echo = TRUE, fig.width = 10, fig.asp = 1.15, out.height = '100%', fig.retina = 4, warnings = FALSE, message = FALSE, comment = FALSE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+
+# -----------------------------------------------
+# grid plot
+# -----------------------------------------------
+
+library(patchwork)
+
+layout <- "
+AB
+AB
+AB
+"
+
+p1 <- ses_plot
+p2 <- ce_plot
+
+all_gap <- p1 + p2 +
+plot_layout(design = layout) +
+plot_annotation(
+  theme = theme(
+  plot.background = element_rect(fill = "transparent", color = NA),
+  panel.background = element_rect(fill = "transparent")
+    )
+  )
+
+all_gap
+
+```
+
+## Full decomposition
+
+```{r echo = TRUE, fig.width = 10, fig.asp = 1.15, out.height = '100%', fig.retina = 4, warnings = FALSE, message = FALSE, comment = FALSE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+
+# -----------------------------------------------
+# grid plot
+# -----------------------------------------------
+
+library(patchwork)
+
+layout <- "
+AB
+AB
+AB
+"
+
+p2 <- ce_plot
+p3 <- gap_plot
+
+
+all_gap <- p2 + p3 +
+plot_layout(design = layout) +
+plot_annotation(
+  theme = theme(
+  plot.background = element_rect(fill = "transparent", color = NA),
+  panel.background = element_rect(fill = "transparent")
+    )
+  )
+
+all_gap
+
+```

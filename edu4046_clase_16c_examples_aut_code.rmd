@@ -1,0 +1,828 @@
+---
+title: "Code: Mediación ejemplos"
+subtitle: "clase 16"
+author: "dacarras"
+date: "Noviembre 17, 2022"
+output: github_document
+---
+
+
+```{r , echo=TRUE, include = FALSE}
+# -----------------------------------------------
+# general setup
+# -----------------------------------------------
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(dev = 'png')
+options(knitr.kable.NA = '')
+options(scipen = 9999)
+
+rm(list = ls()) # remove all previous objects
+
+# fonts
+Sys.setenv(LANG="en_US.UTF-8")
+
+# -----------------------------------------------
+# get times
+# -----------------------------------------------
+
+start_time <- Sys.time()
+
+# -----------------------------------------------
+# local path
+# -----------------------------------------------
+
+# get local path from relative path
+local_path <- function(x){
+paste0(tools::file_path_as_absolute(x),'/')  
+}
+
+
+
+```
+
+# Folder locations
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# folder locations
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# get local path from relative path
+# -----------------------------------------------
+
+local_path <- function(x){
+paste0(tools::file_path_as_absolute(x),'/')  
+}
+
+# -----------------------------------------------
+# dacarras folders
+# -----------------------------------------------
+
+data_folder   <- local_path(getwd())
+output_folder <- local_path(getwd())
+
+# -----------------------------------------------
+# check folders
+# -----------------------------------------------
+
+list.files(data_folder)
+list.files(output_folder)
+
+# -----------------------------------------------
+# load main library
+# -----------------------------------------------
+
+library(dplyr)
+
+```
+
+
+# Read files
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# open file
+# -------------------------------------------------------------------
+
+data_aut <- readRDS('data_aut.rds')
+
+# -----------------------------------------------
+# check data structure
+# -----------------------------------------------
+
+dplyr::glimpse(data_aut)
+
+
+```
+
+# Population Model
+
+## Naive Model
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(aut, ses, civ, id_j) %>%
+             na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+aut ~ c*ses # y <- x
+aut ~ b*civ # y <- m
+
+civ ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m01 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09)
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m01, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m01) %>%
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+
+```
+
+## Clustered Errors
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(aut, ses, civ, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+aut ~ c*ses # y <- x
+aut ~ b*civ # y <- m
+
+civ ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m02 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09,
+       cluster = 'id_j') 
+
+# Mote: last line requests clustered errors
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m02, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m02) %>%
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+
+## Bootstrapped errors
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(aut, ses, civ, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+aut ~ c*ses # y <- x
+aut ~ b*civ # y <- m
+
+civ ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+'
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m03 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09,
+       bootstrap = 5000,
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m03, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m03,
+boot.ci.type = "bca.simple") %>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+## Graded Response model
+
+- Can't account for clustered errors simultaneously.
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(au1:au9, ses, civ, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+lau =~ 1*au1
+lau =~ 1*au2
+lau =~ 1*au3
+lau =~ 1*au4
+lau =~ 1*au5
+lau =~ 1*au6
+lau =~ 1*au7
+lau =~ 1*au8
+lau =~ 1*au9
+
+lau~~var*lau
+
+lau ~ c*ses # y <- x
+lau ~ b*civ # y <- m
+
+civ ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+'
+
+# -----------------------------------------------
+# ordinal indicators
+# -----------------------------------------------
+
+aut_items <- data_ch09 %>%
+             dplyr::select(au1:au9) %>%
+             names()
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       estimator = 'WLSMV',
+       data = data_ch09,
+       ordered= aut_items,
+       bootstrap = 5000
+       )
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m04, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m04,
+boot.ci.type = "bca.simple") %>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+
+## Graded Response model (2pl)
+
+- Can't account for clustered errors simultaneously.
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(au1:au9, ses, civ, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+lau =~ NA*au1
+lau =~ l2*au2
+lau =~ l3*au3
+lau =~ l4*au4
+lau =~ l5*au5
+lau =~ l6*au6
+lau =~ l7*au7
+lau =~ l8*au8
+lau =~ l9*au9
+
+lau~~1*lau
+
+lau ~ c*ses # y <- x
+lau ~ b*civ # y <- m
+
+civ ~ a*ses # m <- x
+
+# effects of interest
+xm  := a
+my  := b
+xy  := c
+tot := c + a*b
+ind := a*b
+dir := c
+'
+
+# -----------------------------------------------
+# ordinal indicators
+# -----------------------------------------------
+
+aut_items <- data_ch09 %>%
+             dplyr::select(au1:au9) %>%
+             names()
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       estimator = 'WLSMV',
+       data = data_ch09,
+       ordered= aut_items,
+       bootstrap = 5000
+       )
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m04, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m04,
+boot.ci.type = "bca.simple") %>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+# Multigroup Model
+
+## Free parameters
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+
+data_ch09_mg <- data_aut %>%
+                dplyr::filter(cty %in% c('CHL')) %>%
+                dplyr::filter(year == 2009) %>%
+                dplyr::select(aut, ses, civ, inx, id_j) %>%
+                na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+aut ~ c(c1,c2)*ses # y <- x
+aut ~ c(b1,b2)*civ # y <- m
+
+civ ~ c(a1,a2)*ses # m <- x
+
+# free intercepts
+aut ~ c(i1, i2)*1
+civ ~ c(i3, i4)*1
+
+
+# indirect effects g1
+tot1 := c1 + a1*b1
+ind1 := a1*b1
+dir1 := c1
+
+## indirect effects g2
+tot2 := c2 + a2*b2
+ind2 := a2*b2
+dir2 := c2
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m05 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09_mg,
+       group = 'inx',
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m05, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m05)%>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+lavaan::parameterEstimates(m05)%>% 
+dplyr::filter(label %in% c('a1','a2')) %>%
+knitr::kable(., digits = 2)
+
+lavaan::parameterEstimates(m05)%>% 
+dplyr::filter(label %in% c('b1','b2')) %>%
+knitr::kable(., digits = 2)
+
+lavaan::parameterEstimates(m05)%>% 
+dplyr::filter(label %in% c('tot1','tot2')) %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+## Constrained direct and second stage parameters
+
+```{r, echo=TRUE}
+
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+
+data_ch09_mg <- data_aut %>%
+                dplyr::filter(cty %in% c('CHL')) %>%
+                dplyr::filter(year == 2009) %>%
+                dplyr::select(aut, ses, civ, inx, id_j) %>%
+                na.omit()
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+aut ~ c(c1,c1)*ses # y <- x
+aut ~ c(b1,b1)*civ # y <- m
+
+civ ~ c(a1,a2)*ses # m <- x
+
+# free intercepts
+aut ~ c(i1, i2)*1
+civ ~ c(i3, i4)*1
+
+
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m05c <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09_mg,
+       group = 'inx',
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# likelihood ratio test
+# -----------------------------------------------
+
+lavaan::lavTestLRT(m05, m05c, method = 'satorra.bentler.2001')
+
+# -----------------------------------------------
+# conclusion
+# -----------------------------------------------
+
+# Note: first stage moderation. 
+#       Family's Political interested accelerates
+#       the effect of socioeconomic level on civic knowledge.
+
+```
+
+# Multilevel Mediation
+
+## Multilevel latent covariate
+
+- 1-1-1 model (unconflated MLM)
+- Preacher, K. J., Zyphur, M. J., & Zhang, Z. (2010). A general multilevel SEM framework for assessing multilevel mediation. Psychological Methods, 15(3), 209–233. https://doi.org/10.1037/a0020141
+- [download link](https://www.dropbox.com/s/gxa0hj0o61fu7tg/Preacher%2C%20Zyphur%2C%20Zhang_2010.pdf?dl=1)
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch09 <- data_aut %>%
+             dplyr::filter(cty %in% c('CHL')) %>%
+             dplyr::filter(year == 2009) %>%
+             dplyr::select(aut, ses, civ, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+level: 1
+aut ~ c1*ses # y <- x
+aut ~ b1*civ # y <- m
+civ ~ a1*ses # m <- x
+
+level: 2
+aut ~ c2*ses # y <- x
+aut ~ b2*civ # y <- m
+civ ~ a2*ses # m <- x
+
+## L1 effects
+xm1  := a1
+my1  := b1
+xy1  := c1
+tot1 := c1 + a1*b1
+ind1 := a1*b1
+dir1 := c1
+
+## L2 effects
+xm2  := a2
+my2  := b2
+xy2  := c2
+tot2 := c2 + a2*b2
+ind2 := a2*b2
+dir2 := c2
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch09,
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m04, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m04)%>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
+
+
+
+
+
+
+## Multilevel (1-2-1-1) Open Classroom Discussion
+
+```{r, echo=TRUE}
+
+# -------------------------------------------------------------------
+# lavaan
+# -------------------------------------------------------------------
+
+# -----------------------------------------------
+# prep data
+# -----------------------------------------------
+
+data_ch16 <- data_aut %>%
+             dplyr::filter(year == 2016) %>%
+             dplyr::select(aut, ses, civ, opd, cln, id_j) %>%
+             na.omit()
+
+
+# -----------------------------------------------
+# define model
+# -----------------------------------------------
+
+lavaan_model <-'
+level: 1
+aut ~ c11*ses
+aut ~ b11*civ
+aut ~ e11*opd
+
+civ ~ a11*ses
+civ ~ d11*opd
+
+opd ~ f11*ses
+
+
+level: 2
+aut ~ c21*ses
+aut ~ b21*civ
+aut ~ e21*opd
+
+civ ~ a21*ses
+civ ~ d21*opd
+
+opd ~ f21*ses
+
+
+## indirect effects 2
+ind1 := f21*e21
+ind2 := f21*d21*b21
+ind3 := a21*b21
+dir2 := c21
+tot2 := c21 + ind1 + ind2 + ind3
+
+'
+
+
+# -----------------------------------------------
+# fit model
+# -----------------------------------------------
+
+m04 <- lavaan::sem(lavaan_model, 
+       mimic = 'MPLUS',
+       data = data_ch16,
+       cluster = 'id_j')
+
+# -----------------------------------------------
+# display summary
+# -----------------------------------------------
+
+lavaan::summary(m04, 
+  fit.measures=TRUE,
+  standardized=TRUE,
+  rsquare=TRUE)
+
+#------------------------------------------------
+# indirect effects
+#------------------------------------------------
+
+lavaan::parameterEstimates(m04)%>% 
+dplyr::filter(op == ':=') %>%
+knitr::kable(., digits = 2)
+
+
+```
